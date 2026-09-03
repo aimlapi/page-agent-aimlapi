@@ -42,7 +42,9 @@ export function modelPatch(body: Record<string, any>, baseURL?: string) {
 
 	const provider = getProvider(baseURL)
 
-	const modelName = normalizeModelName(model)
+	const modelName = normalizeModelName(
+		provider === 'aimlapi' ? restoreAimlapiVersionDot(model) : model
+	)
 
 	if (modelName.startsWith('qwen')) {
 		debug('Patch Qwen: disable thinking')
@@ -192,6 +194,18 @@ export function modelPatch(body: Record<string, any>, baseURL?: string) {
 		}
 	}
 
+	if (provider === 'aimlapi') {
+		// aimlapi.com validates reasoning_effort against 'none' | 'low' | 'medium' | 'high'
+		// and rejects OpenAI's 'minimal' with a 400 before the model is reached, so the
+		// gpt-5 / gemini-3.x-flash patches above make those models unusable there.
+		// 'low' is the closest accepted value and is verified to work on every model that
+		// receives 'minimal' (gpt-5, gpt-5-mini, gemini-3.5-flash, gemini-3.1-flash-lite).
+		if (body.reasoning_effort === 'minimal') {
+			debug('Patch aimlapi: reasoning_effort "minimal" is not accepted, lower to "low"')
+			body.reasoning_effort = 'low'
+		}
+	}
+
 	return body
 }
 
@@ -227,12 +241,25 @@ export function normalizeModelName(modelName: string): string {
 	return normalizedName
 }
 
-export function getProvider(baseURL?: string): 'openrouter' | undefined {
+/**
+ * aimlapi.com publishes some OpenAI models with the version separated by a dash
+ * instead of a dot — `openai/gpt-5-4` is `gpt-5.4`, `openai/gpt-5-5` is `gpt-5.5`.
+ * `normalizeModelName` strips dots but cannot tell that dash apart from a name
+ * suffix, so `gpt-5-4` would be normalized to `gpt-5-4` and patched as if it were
+ * plain `gpt-5` — which sends `reasoning_effort` to a model that rejects it
+ * alongside function tools. Restore the dot before the model family is resolved.
+ */
+export function restoreAimlapiVersionDot(model: string): string {
+	return model.replace(/^(openai\/gpt-\d)-(\d)(?=-|$)/, '$1.$2')
+}
+
+export function getProvider(baseURL?: string): 'openrouter' | 'aimlapi' | undefined {
 	if (!baseURL) return undefined
 	try {
 		const url = new URL(baseURL)
 		const hostname = url.hostname
 		if (hostname === 'openrouter.ai') return 'openrouter'
+		if (hostname === 'api.aimlapi.com') return 'aimlapi'
 		return undefined
 	} catch (e) {
 		return undefined
