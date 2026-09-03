@@ -153,8 +153,21 @@ const pageAgent = new PageAgent({
   apiKey: 'your-api-key',
   model: 'qwen3.5-plus'
 });
+
+// Multi-vendor gateways (e.g., aimlapi.com) serve every brand above
+// behind one base URL. Model ids are prefixed with the vendor.
+const gatewayAgent = new PageAgent({
+  baseURL: 'https://api.aimlapi.com/v1',
+  apiKey: 'your-api-key',
+  model: 'openai/gpt-5.4-mini'
+});
 `}
 				/>
+				<p className="mt-3 text-sm text-gray-600 dark:text-gray-400">
+					{isZh
+						? '聚合网关（如 aimlapi.com、OpenRouter）用同一个 baseURL 提供上表中的所有品牌，模型 id 带有厂商前缀，例如 anthropic/claude-haiku-4.5、google/gemini-3.5-flash、alibaba/qwen3.5-plus。'
+						: 'Aggregator gateways such as aimlapi.com and OpenRouter serve every brand in the list above behind a single baseURL, with vendor-prefixed model ids — for example anthropic/claude-haiku-4.5, google/gemini-3.5-flash, alibaba/qwen3.5-plus.'}
+				</p>
 			</section>
 
 			<section className="mb-10">
