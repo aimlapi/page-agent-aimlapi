@@ -141,6 +141,10 @@ function toOpenRouterModelId(brand: string, model: string): string {
 }
 
 const PROVIDERS = {
+	aimlapi: {
+		baseURL: 'https://api.aimlapi.com/v1',
+		apiKey: process.env.TESTING_AIMLAPI_KEY,
+	},
 	openrouter: {
 		baseURL: 'https://openrouter.ai/api/v1',
 		apiKey: process.env.TESTING_OPENROUTER_KEY,
@@ -152,10 +156,6 @@ const PROVIDERS = {
 	deepseek: {
 		baseURL: 'https://api.deepseek.com',
 		apiKey: process.env.TESTING_DEEPSEEK_KEY,
-	},
-	aimlapi: {
-		baseURL: 'https://api.aimlapi.com/v1',
-		apiKey: process.env.TESTING_AIMLAPI_KEY,
 	},
 } as const
 
@@ -179,23 +179,6 @@ async function expectEchoToolCall(baseURL: string, apiKey: string, model: string
 	})
 	expect(result.toolResult).toBe('PING')
 }
-
-describe.concurrent('OpenRouter — all listed models', () => {
-	const { baseURL, apiKey } = PROVIDERS.openrouter
-
-	for (const [brand, models] of Object.entries(MODEL_GROUPS)) {
-		for (const model of models) {
-			const id = toOpenRouterModelId(brand, model)
-			it.skipIf(!apiKey)(
-				id,
-				async () => {
-					await expectEchoToolCall(baseURL, apiKey!, id)
-				},
-				TEST_TIMEOUT
-			)
-		}
-	}
-})
 
 /**
  * aimlapi.com is an aggregator like OpenRouter: one OpenAI-compatible base URL
@@ -272,6 +255,23 @@ describe.concurrent('aimlapi.com — all listed models', () => {
 		for (const model of models) {
 			if (AIMLAPI_UNSUPPORTED.has(model) || AIMLAPI_UNRELIABLE_TOOL_CHOICE.has(model)) continue
 			const id = toAimlapiModelId(brand, model)
+			it.skipIf(!apiKey)(
+				id,
+				async () => {
+					await expectEchoToolCall(baseURL, apiKey!, id)
+				},
+				TEST_TIMEOUT
+			)
+		}
+	}
+})
+
+describe.concurrent('OpenRouter — all listed models', () => {
+	const { baseURL, apiKey } = PROVIDERS.openrouter
+
+	for (const [brand, models] of Object.entries(MODEL_GROUPS)) {
+		for (const model of models) {
+			const id = toOpenRouterModelId(brand, model)
 			it.skipIf(!apiKey)(
 				id,
 				async () => {

@@ -147,19 +147,19 @@ export default function Models() {
 			<section className="mb-10">
 				<Heading id="configuration">{isZh ? '配置方式' : 'Configuration'}</Heading>
 				<CodeEditor
-					code={`// OpenAI-compatible services (e.g., Alibaba Bailian)
-const pageAgent = new PageAgent({
-  baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
-  apiKey: 'your-api-key',
-  model: 'qwen3.5-plus'
-});
-
-// Multi-vendor gateways (e.g., aimlapi.com) serve every brand above
+					code={`// Multi-vendor gateways (e.g., aimlapi.com) serve every brand above
 // behind one base URL. Model ids are prefixed with the vendor.
-const gatewayAgent = new PageAgent({
+const pageAgent = new PageAgent({
   baseURL: 'https://api.aimlapi.com/v1',
   apiKey: 'your-api-key',
   model: 'openai/gpt-5.4-mini'
+});
+
+// Single-vendor OpenAI-compatible services (e.g., Alibaba Bailian)
+const bailianAgent = new PageAgent({
+  baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+  apiKey: 'your-api-key',
+  model: 'qwen3.5-plus'
 });
 `}
 				/>
