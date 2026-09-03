@@ -17,7 +17,7 @@ The supported model list lives in three places that must stay in sync:
 ## Before Touching Anything
 
 1. Run `git status`. If the working tree has uncommitted changes that look like unrelated in-progress work, do NOT edit files — report the situation and ask the user for permission first.
-2. Run the full live test suite as a baseline: `npm run test:live -w @page-agent/llms`. API keys come from the repo-root `.env` (`TESTING_OPENROUTER_KEY`, `TESTING_ALIYUN_KEY`, `TESTING_DEEPSEEK_KEY`); tests skip silently when a key is missing, so check which providers actually ran. Record which models pass/fail before making changes, so new failures are attributable.
+2. Run the full live test suite as a baseline: `npm run test:live -w @page-agent/llms`. API keys come from the repo-root `.env` (`TESTING_OPENROUTER_KEY`, `TESTING_ALIYUN_KEY`, `TESTING_DEEPSEEK_KEY`, `TESTING_AIMLAPI_KEY`); tests skip silently when a key is missing, so check which providers actually ran. Record which models pass/fail before making changes, so new failures are attributable.
 
 ## Workflow A: A Specific Model Was Given
 
