@@ -24,6 +24,7 @@
  *   TESTING_OPENROUTER_KEY=...
  *   TESTING_DEEPSEEK_KEY=...
  *   TESTING_ALIYUN_KEY=...
+ *   TESTING_AIMLAPI_KEY=...
  */
 import { config as dotenvConfig } from 'dotenv'
 import { dirname, resolve } from 'path'
@@ -167,6 +168,10 @@ function toOpenRouterModelId(brand: string, model: string): string {
 }
 
 const PROVIDERS = {
+	aimlapi: {
+		baseURL: 'https://api.aimlapi.com/v1',
+		apiKey: process.env.TESTING_AIMLAPI_KEY,
+	},
 	openrouter: {
 		baseURL: 'https://openrouter.ai/api/v1',
 		apiKey: process.env.TESTING_OPENROUTER_KEY,
@@ -201,6 +206,92 @@ async function expectEchoToolCall(baseURL: string, apiKey: string, model: string
 	})
 	expect(result.toolCall.name).toBe('echo')
 }
+
+/**
+ * aimlapi.com is an aggregator like OpenRouter: one OpenAI-compatible base URL
+ * serves every brand in MODEL_GROUPS, and ids are `<vendor-slug>/<model-id>`.
+ * Vendor slugs are its own, not OpenRouter's — Qwen is `alibaba`, Moonshot is
+ * `moonshot`, Z.AI is `zhipu`.
+ */
+const AIMLAPI_VENDOR_SLUG: Record<string, string> = {
+	Qwen: 'alibaba',
+	OpenAI: 'openai',
+	DeepSeek: 'deepseek',
+	Google: 'google',
+	Anthropic: 'anthropic',
+	MiniMax: 'minimax',
+	xAI: 'x-ai',
+	Tencent: 'tencent',
+	MoonshotAI: 'moonshot',
+	'Z.AI': 'zhipu',
+}
+
+/**
+ * Overrides for models whose aimlapi.com id doesn't match the
+ * `<vendor-slug>/<lowercased-name>` heuristic — dated snapshots, "-preview"
+ * suffixes, and dashes where the display name has a dot (or the reverse).
+ * Verified against `GET https://api.aimlapi.com/v1/models` on 2026-09-03 and by
+ * a real tool call on every id below; re-check when models are added.
+ */
+const AIMLAPI_ID_OVERRIDES: Record<string, string> = {
+	'gpt-5.5': 'openai/gpt-5-5',
+	'gpt-5.4': 'openai/gpt-5-4',
+	'gpt-5.2': 'openai/gpt-5-2',
+	'gpt-5.1': 'openai/gpt-5-1',
+	'deepseek-3.2': 'deepseek/deepseek-non-thinking-v3.2-exp',
+	'gemini-3.1-pro': 'google/gemini-3.1-pro-preview',
+	'claude-sonnet-4-5': 'anthropic/claude-sonnet-4.5',
+	'claude-haiku-4-5': 'anthropic/claude-haiku-4.5',
+	'MiniMax-M2.7': 'minimax/m2-7-20260402',
+	'MiniMax-M2.5': 'minimax/m2-5-20260218',
+	'grok-4.5': 'x-ai/grok-4-5',
+	'grok-4.3': 'x-ai/grok-4-3',
+	'grok-build-0.1': 'x-ai/grok-build-0-1',
+}
+
+/**
+ * Served by aimlapi.com but not drivable by PageAgent, which always sends a
+ * `tool_choice`. On that channel these models keep thinking enabled — neither
+ * `enable_thinking: false` (Qwen) nor `thinking: { type: 'disabled' }` (Kimi)
+ * is honored — and then reject every `tool_choice` value, named or `required`,
+ * with a 400. Same shape as the `deepseek-3.2` exclusion below. Re-probe before
+ * removing an entry; they work on other channels.
+ */
+const AIMLAPI_UNSUPPORTED = new Set(['qwen3.6-max', 'kimi-k2.7-code', 'kimi-k2.6', 'kimi-k2.5'])
+
+/**
+ * Answer on aimlapi.com, but a named `tool_choice` is not always honored there:
+ * roughly 1 call in 4 comes back as plain assistant text with
+ * `finish_reason: 'stop'` and no `tool_calls` (measured over 8 calls each,
+ * 2026-09-03). The `LLM` retry wrapper recovers from that in real use, but this
+ * suite calls `OpenAIClient` directly on purpose, so they would flake here.
+ */
+const AIMLAPI_UNRELIABLE_TOOL_CHOICE = new Set(['qwen3.7-max', 'qwen3.6-flash'])
+
+function toAimlapiModelId(brand: string, model: string): string {
+	if (model in AIMLAPI_ID_OVERRIDES) return AIMLAPI_ID_OVERRIDES[model]
+	const slug = AIMLAPI_VENDOR_SLUG[brand]
+	if (!slug) throw new Error(`No aimlapi.com vendor slug mapped for brand "${brand}"`)
+	return `${slug}/${model.toLowerCase()}`
+}
+
+describe.concurrent('aimlapi.com — all listed models', () => {
+	const { baseURL, apiKey } = PROVIDERS.aimlapi
+
+	for (const [brand, models] of Object.entries(MODEL_GROUPS)) {
+		for (const model of models) {
+			if (AIMLAPI_UNSUPPORTED.has(model) || AIMLAPI_UNRELIABLE_TOOL_CHOICE.has(model)) continue
+			const id = toAimlapiModelId(brand, model)
+			it.skipIf(!apiKey)(
+				id,
+				async () => {
+					await expectEchoToolCall(baseURL, apiKey!, id)
+				},
+				TEST_TIMEOUT
+			)
+		}
+	}
+})
 
 describe.concurrent('OpenRouter — all listed models', () => {
 	const { baseURL, apiKey } = PROVIDERS.openrouter
